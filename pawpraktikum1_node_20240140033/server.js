@@ -1,22 +1,17 @@
-// server.js
-
 const express = require("express");
+const cors = require("cors");
 const app = express();
-const port = 3001;
+const PORT = 3001;
+const morgan = require("morgan");
 
-const bookRoutes = require("./routes/books");
+// Impor router
+const presensiRoutes = require("./routes/presensi");
+const reportRoutes = require("./routes/reports");
+
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use("/api/books", bookRoutes);
-
-app.get("/", (req, res) => {
-  // Kirim respon dalam format JSON
-  res.json({ message: "Hello i am from Server!" });
-});
-
-app.listen(port, () => {
-  console.log(`Server jalan di http://localhost:${port}`);
-});
-
+app.use(morgan("dev"));
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
@@ -26,7 +21,14 @@ app.get("/", (req, res) => {
   res.send("Home Page for API");
 });
 
+
+
+// Gunakan router
+app.use("/api/presensi", presensiRoutes);
+app.use("/api/reports", reportRoutes);
 app.listen(PORT, () => {
-  console.log(`Express server running at http://localhost:${PORT}/`);  
-});
- 	
+  console.log(`Server berjalan di http://localhost:${PORT}`);
+}); 
+
+module.exports = app; 
+
