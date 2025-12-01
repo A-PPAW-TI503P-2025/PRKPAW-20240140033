@@ -1,29 +1,51 @@
-const { Presensi } = require("../models");
+const { Presensi, User } = require("../models");
 const { Op } = require("sequelize");
 
-exports.getDailyReport = async(req, res) => {
-    try {
-      const { nama, tanggalMulai, tanggalSelesai } = req.query;
-      let options = {where: {} };
+exports.getDailyReport = async (req, res) => {
+  try {
+    const { nama, tanggalMulai, tanggalSelesai } = req.query;
 
-      if (nama) {
-        options.where.nama = { [Op.like]: `%${nama}%` };
+    let options = {
+      include: [
+        {
+          model: User,
+          as: "user", // Ini sekarang akan COCOK dengan model di atas
+          attributes: ["nama", "email"],
+        },
+      ],
+      where: {},
+      order: [["checkIn", "DESC"]],
+    };
+
+    // Filter Cari Nama (Lewat Relasi User)
+    if (nama) {
+      options.include[0].where = {
+        nama: { [Op.like]: `%${nama}%` },
       };
+    }
 
-      if (tanggalMulai && tanggalSelesai) {
-        options.where.createdAt = {
-          [Op.between]: [new Date(tanggalMulai), new Date(tanggalSelesai)],
-        };
-      }
+    // Filter Tanggal
+    if (tanggalMulai && tanggalSelesai) {
+      // Saran: Gunakan 'checkIn' agar lebih relevan daripada 'createdAt'
+      options.where.checkIn = {
+        [Op.between]: [
+          new Date(tanggalMulai + " 00:00:00"),
+          new Date(tanggalSelesai + " 23:59:59"),
+        ],
+      };
+    }
 
-      const records = await Presensi.findAll(options);
-      res.json({
-        reportDate: new Date().toLocaleDateString(),
-        data: records,
-      });
-    } catch (error) {
-      res
-        .status(500)
-        .json({ message: "Terjadi kesalahan pada server", error: error.message });
-    } 
+    const records = await Presensi.findAll(options);
+
+    res.status(200).json({
+      status: "success",
+      data: records,
+    });
+  } catch (error) {
+    console.error("Error getDailyReport:", error);
+    res.status(500).json({
+      message: "Gagal mengambil laporan",
+      error: error.message,
+    });
+  }
 };

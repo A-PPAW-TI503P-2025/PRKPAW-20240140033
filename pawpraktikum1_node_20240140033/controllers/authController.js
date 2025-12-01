@@ -1,13 +1,14 @@
 const { User } = require("../models");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = "INI_ADALAH_KUNCI_RAHASIA_ANDA_YANG_SANGAT_AMAN";
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Registrasi User
 exports.register = async (req, res) => {
   try {
     const { nama, email, password, role } = req.body;
-    
+
     // Validasi input kosong
     if (!nama || !email || !password) {
       return res
@@ -17,15 +18,17 @@ exports.register = async (req, res) => {
 
     // Validasi role
     if (role && !["mahasiswa", "admin"].includes(role)) {
-      return res.status(400).json({ message: "Role tidak valid. Harus 'mahasiswa' atau 'admin'." });
+      return res
+        .status(400)
+        .json({ message: "Role tidak valid. Harus 'mahasiswa' atau 'admin'." });
     }
 
-    // Hash password 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // simpan user ke database
     const newUser = await User.create({
-      nama,
+      nama: nama,
       email,
       password: hashedPassword,
       role: role || "mahasiswa",
@@ -40,7 +43,9 @@ exports.register = async (req, res) => {
     if (error.name === "SequelizeUniqueConstraintError") {
       return res.status(400).json({ message: "Email sudah terdaftar." });
     }
-    res.status(500).json({ message: "Terjadi kesalahan pada server", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Terjadi kesalahan pada server", error: error.message });
   }
 };
 
@@ -54,7 +59,7 @@ exports.login = async (req, res) => {
       return res.status(404).json({ message: "Email tidak ditemukan." });
     }
 
-    // cek password 
+    // cek password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Password salah." });
@@ -76,6 +81,7 @@ exports.login = async (req, res) => {
       token: token,
     });
   } catch (error) {
+    console.error("Login Error:", error);
     res
       .status(500)
       .json({ message: "Terjadi kesalahan pada server", error: error.message });

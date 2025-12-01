@@ -1,21 +1,27 @@
 const express = require("express");
 const router = express.Router();
 const presensiController = require("../controllers/presensiController");
-const { addUserData } = require("../middleware/permissionMiddleware");
+const { authenticateToken } = require("../middleware/permissionMiddleware");
 
-router.use(addUserData);
+// Middleware untuk mengautentikasi token sebelum mengakses rute presensi
+router.use(authenticateToken);
+
 router.post("/check-in", presensiController.CheckIn);
 router.post("/check-out", presensiController.CheckOut);
+
 router.delete("/:id", presensiController.deletePresensi);
+
 router.put("/:id", presensiController.updatePresensi);
 
-router.post('/', (req, res) => {
-    console.log("Request body:", req.body);
-    res.status(201).json({ message: "Presensi berhasil dicatat!" });
+router.post("/", (req, res) => {
+  console.log("Request body:", req.body);
+  res.status(201).json({ message: "Presensi berhasil dicatat!" });
 });
 
-router.get('/', (req, res) => {
-    res.status(200).json({ message: "Ini adalah endpoint untuk GET semua data presensi" });
+router.get("/", (req, res) => {
+  res
+    .status(200)
+    .json({ message: "Ini adalah endpoint untuk GET semua data presensi" });
 });
 
 router.get("/check-in", (req, res) => {
