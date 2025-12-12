@@ -2,17 +2,54 @@ const { Presensi } = require("../models");
 const { Op } = require("sequelize");
 const { format } = require("date-fns-tz");
 const timeZone = "Asia/Jakarta";
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+const uploadDir = "uploads/";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// UPLOAD FOTO
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/"); 
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+// 2. Filter khusus gambar
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Hanya file gambar yang diizinkan!"), false);
+  }
+};
+
+exports.upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+});
+
 
 exports.CheckIn = async (req, res) => {
   try {
-    // 1. Validasi User & Lokasi
+    // 1. Validasi User
     if (!req.user || !req.user.id) {
       return res
         .status(401)
         .json({ message: "Sesi tidak valid, silakan login ulang." });
     }
     const userId = req.user.id;
+
     const { latitude, longitude } = req.body;
+
+    const buktiFoto = req.file ? req.file.path : null;
 
     if (!latitude || !longitude) {
       return res
@@ -22,31 +59,26 @@ exports.CheckIn = async (req, res) => {
 
     const waktuSekarang = new Date();
 
-    // 2. LOGIKA BARU: Cek Sesi Aktif (Bukan Cek Harian)
-    // Cari data user ini yang kolom checkOut-nya masih KOSONG (null)
     const activeSession = await Presensi.findOne({
       where: {
         userId: userId,
-        checkOut: null, // Artinya dia masih "sedang bekerja"
+        checkOut: null,
       },
     });
 
-    // Jika ada sesi aktif, tolak check-in baru
     if (activeSession) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Anda masih dalam sesi Check-In. Silakan Check-Out terlebih dahulu.",
-        });
+      return res.status(400).json({
+        message:
+          "Anda masih dalam sesi Check-In. Silakan Check-Out terlebih dahulu.",
+      });
     }
 
-    // 3. Simpan Check-In Baru
     const newRecord = await Presensi.create({
       userId: userId,
       checkIn: waktuSekarang,
       latitude: latitude,
       longitude: longitude,
+      buktiFoto: buktiFoto, // Simpan path foto
     });
 
     const formattedData = {
@@ -55,6 +87,7 @@ exports.CheckIn = async (req, res) => {
         timeZone,
       }),
       checkOut: null,
+      buktiFoto: newRecord.buktiFoto,
     };
 
     res.status(201).json({
@@ -82,13 +115,13 @@ exports.CheckOut = async (req, res) => {
     const userId = req.user.id;
     const waktuSekarang = new Date();
 
-    // 1. Cari Sesi yang Belum Selesai (CheckOut masih null)
+    // Cari Sesi Aktif
     const recordToUpdate = await Presensi.findOne({
       where: {
         userId: userId,
-        checkOut: null, // Cari yang statusnya masih aktif
+        checkOut: null,
       },
-      order: [["checkIn", "DESC"]], // Ambil yang paling baru (jaga-jaga)
+      order: [["checkIn", "DESC"]],
     });
 
     if (!recordToUpdate) {
@@ -98,7 +131,7 @@ exports.CheckOut = async (req, res) => {
       });
     }
 
-    // 2. Update Data
+    // Update Data
     recordToUpdate.checkOut = waktuSekarang;
     await recordToUpdate.save();
 
@@ -128,6 +161,5 @@ exports.CheckOut = async (req, res) => {
   }
 };
 
-// ... fungsi lain biarkan saja
 exports.deletePresensi = async (req, res) => {};
 exports.updatePresensi = async (req, res) => {};

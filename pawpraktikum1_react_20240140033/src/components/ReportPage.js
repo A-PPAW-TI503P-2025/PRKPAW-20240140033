@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { getToken } from "../utils/auth.js"; // Pastikan path ini benar
+import { getToken } from "../utils/auth.js";
 
 function ReportPage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Modal Foto
+  const [selectedImage, setSelectedImage] = useState(null);
+
   const navigate = useNavigate();
 
   // State untuk filter
@@ -30,19 +34,17 @@ function ReportPage() {
           Authorization: `Bearer ${token}`,
         },
         params: {
-          nama: searchName, // Kirim parameter nama
-          tanggalMulai: startDate, // Kirim parameter tanggal mulai
-          tanggalSelesai: endDate, // Kirim parameter tanggal selesai
+          nama: searchName,
+          tanggalMulai: startDate,
+          tanggalSelesai: endDate,
         },
       };
 
-      // Request ke backend
       const response = await axios.get(
         "http://localhost:3001/api/reports/daily",
         config
       );
 
-      // Pastikan mengambil array data dengan aman
       setReports(response.data.data || []);
     } catch (err) {
       console.error(err);
@@ -58,19 +60,23 @@ function ReportPage() {
     }
   };
 
-  // Ambil data pertama kali saat halaman dibuka
   useEffect(() => {
     fetchReports();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle saat tombol Cari diklik
   const handleSearch = (e) => {
     e.preventDefault();
     fetchReports();
   };
 
-  // Fungsi untuk format tanggal biar cantik
+  // Helper untuk membuat URL Gambar yang valid
+  const getImageUrl = (path) => {
+    if (!path) return null;
+    // backslash (\) diganti jadi slash (/) untuk kompatibilitas Windows
+    const cleanPath = path.replace(/\\/g, "/");
+    return `http://localhost:3001/${cleanPath}`;
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("id-ID", {
       weekday: "long",
@@ -91,7 +97,29 @@ function ReportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-8 relative">
+      {/* --- MODAL / POPUP FOTO --- */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setSelectedImage(null)} // Klik background untuk tutup
+        >
+          <div className="relative bg-white p-2 rounded-lg max-w-4xl max-h-full overflow-auto">
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-0 right-0 -mt-4 -mr-4 bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold hover:bg-red-700 shadow-lg"
+            >
+              &times;
+            </button>
+            <img
+              src={selectedImage}
+              alt="Bukti Full"
+              className="max-h-[85vh] object-contain rounded"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -112,7 +140,6 @@ function ReportPage() {
             onSubmit={handleSearch}
             className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end"
           >
-            {/* Input Nama */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cari Nama
@@ -122,11 +149,9 @@ function ReportPage() {
                 placeholder="Contoh: Fannandya"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
-            {/* Input Tanggal Mulai */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Dari Tanggal
@@ -135,11 +160,9 @@ function ReportPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
-            {/* Input Tanggal Selesai */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Sampai Tanggal
@@ -148,35 +171,18 @@ function ReportPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-
-            {/* Tombol Cari */}
             <button
               type="submit"
               className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition duration-300 flex items-center justify-center gap-2"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
               Filter Data
             </button>
           </form>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="bg-red-50 text-red-700 p-4 rounded-lg border-l-4 border-red-500 mb-6 shadow-sm">
             <p className="font-bold">Terjadi Kesalahan</p>
@@ -184,7 +190,6 @@ function ReportPage() {
           </div>
         )}
 
-        {/* Loading State */}
         {loading ? (
           <div className="text-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
@@ -202,6 +207,10 @@ function ReportPage() {
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Nama Karyawan
+                    </th>
+                    {/* KOLOM BARU */}
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Bukti Foto
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Tanggal
@@ -241,6 +250,26 @@ function ReportPage() {
                             </div>
                           </div>
                         </td>
+
+                        {/* --- ISI KOLOM FOTO --- */}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.buktiFoto ? (
+                            <img
+                              src={getImageUrl(item.buktiFoto)}
+                              alt="Bukti"
+                              className="h-12 w-12 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80 transition"
+                              onClick={() =>
+                                setSelectedImage(getImageUrl(item.buktiFoto))
+                              }
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">
+                              No Foto
+                            </span>
+                          )}
+                        </td>
+                        {/* ---------------------- */}
+
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {formatDate(item.checkIn)}
                         </td>
@@ -276,31 +305,12 @@ function ReportPage() {
                   ) : (
                     <tr>
                       <td
-                        colSpan="6"
+                        colSpan="7"
                         className="px-6 py-10 text-center text-gray-500"
                       >
-                        <div className="flex flex-col items-center justify-center">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-12 w-12 text-gray-300 mb-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                            />
-                          </svg>
-                          <p className="text-lg font-medium">
-                            Data tidak ditemukan
-                          </p>
-                          <p className="text-sm">
-                            Coba ubah filter pencarian Anda.
-                          </p>
-                        </div>
+                        <p className="text-lg font-medium">
+                          Data tidak ditemukan
+                        </p>
                       </td>
                     </tr>
                   )}

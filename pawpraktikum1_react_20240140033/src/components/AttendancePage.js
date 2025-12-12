@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import axios from "axios";
+import Webcam from "react-webcam";
 import { getToken } from "../utils/auth.js";
 
 // --- 1. Import Komponen Peta ---
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css"; // Wajib import CSS ini
-import L from "leaflet"; // Import Leaflet core untuk fix icon
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 
-// --- 2. Fix Icon Marker yang Hilang (Bug bawaan Leaflet di React) ---
+// --- 2. Fix Icon Marker Leaflet ---
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
@@ -20,9 +21,19 @@ function AttendancePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // State baru untuk menyimpan posisi peta setelah sukses
+  // State untuk Peta & Foto
   const [mapPosition, setMapPosition] = useState(null);
+  const [image, setImage] = useState(null);
 
+  const webcamRef = useRef(null);
+
+  // --- Fungsi Ambil Foto ---
+  const capture = useCallback(() => {
+    const imageSrc = webcamRef.current.getScreenshot();
+    setImage(imageSrc);
+  }, [webcamRef]);
+
+  // --- Fungsi Ambil Lokasi ---
   const getLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -47,7 +58,7 @@ function AttendancePage() {
     setMessage("");
     setError("");
     setLoading(true);
-    setMapPosition(null); // Reset peta setiap kali tombol ditekan
+    setMapPosition(null);
 
     const token = getToken();
     if (!token) {
@@ -56,31 +67,54 @@ function AttendancePage() {
       return;
     }
 
+    // Validasi Khusus Check-In: Wajib Ada Foto
+    if (type === "check-in" && !image) {
+      setError("Wajib ambil foto selfie untuk Check-In!");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // 1. Ambil Lokasi
       const location = await getLocation();
 
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
+      // 2. Siapkan Data (FormData untuk upload foto)
+      let requestData;
+      let headers = { Authorization: `Bearer ${token}` };
+
+      if (type === "check-in") {
+        // Kalau Check-In: Kirim FormData (Gambar + Lokasi)
+        const blob = await (await fetch(image)).blob();
+        const formData = new FormData();
+        formData.append("latitude", location.lat);
+        formData.append("longitude", location.lon);
+        formData.append("image", blob, "selfie.jpg"); // Sesuaikan key 'image' dengan backend multer
+
+        requestData = formData;
+        // Axios otomatis set Content-Type multipart/form-data kalau data-nya FormData
+      } else {
+        // Kalau Check-Out: Kirim JSON biasa (Lokasi aja)
+        requestData = {
+          latitude: location.lat,
+          longitude: location.lon,
+        };
+      }
 
       const url =
         type === "check-in"
           ? "http://localhost:3001/api/presensi/check-in"
           : "http://localhost:3001/api/presensi/check-out";
 
-      const response = await axios.post(
-        url,
-        {
-          latitude: location.lat,
-          longitude: location.lon,
-        },
-        config
-      );
+      // 3. Kirim Request
+      const response = await axios.post(url, requestData, { headers });
 
       setMessage(response.data.message);
 
-      // --- 3. Set Posisi Peta jika Berhasil ---
+      // Tampilkan Peta setelah sukses
       setMapPosition([location.lat, location.lon]);
+
+      // Reset foto setelah sukses check-in
+      if (type === "check-in") setImage(null);
     } catch (err) {
       console.error(err);
       if (err.message && err.message.includes("GPS")) {
@@ -96,15 +130,54 @@ function AttendancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4 py-10">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md text-center">
         <h2 className="text-3xl font-bold mb-6 text-gray-800">
           Lakukan Presensi
         </h2>
 
+        {/* --- Bagian Webcam (Khusus sebelum Check-In) --- */}
+        {!mapPosition && (
+          <div className="mb-6">
+            <div className="rounded-lg overflow-hidden border-2 border-gray-300 bg-black mb-4">
+              {image ? (
+                <img
+                  src={image}
+                  alt="Selfie"
+                  className="w-full h-64 object-cover"
+                />
+              ) : (
+                <Webcam
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  className="w-full h-64 object-cover"
+                  videoConstraints={{ facingMode: "user" }}
+                />
+              )}
+            </div>
+
+            {image ? (
+              <button
+                onClick={() => setImage(null)}
+                className="text-sm text-blue-600 underline"
+              >
+                Foto Ulang
+              </button>
+            ) : (
+              <button
+                onClick={capture}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold"
+              >
+                Ambil Foto
+              </button>
+            )}
+          </div>
+        )}
+
         {loading && (
           <p className="text-blue-500 mb-4 font-semibold animate-pulse">
-            Mendeteksi lokasi...
+            Memproses...
           </p>
         )}
         {message && (
@@ -140,9 +213,9 @@ function AttendancePage() {
           </button>
         </div>
 
-        {/* --- 4. Tampilkan Peta Hanya Jika mapPosition Ada --- */}
+        {/* --- Tampilkan Peta Hanya Jika Berhasil --- */}
         {mapPosition && (
-          <div className="w-full h-64 rounded-lg overflow-hidden border-2 border-blue-200 shadow-inner">
+          <div className="w-full h-64 rounded-lg overflow-hidden border-2 border-blue-200 shadow-inner animate-fade-in">
             <MapContainer
               center={mapPosition}
               zoom={16}
@@ -153,10 +226,12 @@ function AttendancePage() {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
               <Marker position={mapPosition}>
-                <Popup>Lokasi Anda saat presensi.</Popup>
+                <Popup>Lokasi Presensi Anda</Popup>
               </Marker>
             </MapContainer>
-            <p className="text-xs text-gray-500 mt-2">Lokasi Terdeteksi</p>
+            <p className="text-xs text-gray-500 mt-2">
+              Lokasi & Foto Berhasil Dikirim
+            </p>
           </div>
         )}
       </div>

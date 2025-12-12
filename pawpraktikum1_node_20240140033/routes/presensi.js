@@ -6,7 +6,8 @@ const { authenticateToken } = require("../middleware/permissionMiddleware");
 // Middleware untuk mengautentikasi token sebelum mengakses rute presensi
 router.use(authenticateToken);
 
-router.post("/check-in", presensiController.CheckIn);
+router.post("/check-in", presensiController.upload.single("image"), presensiController.CheckIn);
+
 router.post("/check-out", presensiController.CheckOut);
 
 router.delete("/:id", presensiController.deletePresensi);
