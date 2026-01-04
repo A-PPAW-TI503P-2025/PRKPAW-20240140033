@@ -41,6 +41,10 @@ const Navbar = () => {
               Dashboard
             </Link>
 
+            <Link to="/monitoring" className="hover:text-blue-200 font-medium">
+              Monitoring Suhu
+            </Link>
+
             <Link to="/presensi" className="hover:text-blue-200 font-medium">
               Presensi
             </Link>

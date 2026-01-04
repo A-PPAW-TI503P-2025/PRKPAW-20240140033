@@ -6,6 +6,7 @@ import DashboardPage from "./components/DashboardPage.js";
 import AttendancePage from "./components/AttendancePage.js";
 import Navbar from "./components/Navbar.js";
 import ReportPage from "./components/ReportPage.js";
+import SensorPage from "./components/SensorPage.js";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/presensi" element={<AttendancePage />} />
         <Route path="/reports" element={<ReportPage />} />{" "}
         <Route path="/" element={<LoginPage />} />
+        <Route path="/monitoring" element={<SensorPage />} />
       </Routes>
     </Router>
   );
